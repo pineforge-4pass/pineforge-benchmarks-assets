@@ -1,0 +1,28 @@
+//@version=6
+// Canonical indicator script for the three-way engine comparison.
+// Computes a small fixed set of TA functions on the reference 36k-bar
+// OHLCV feed; each engine emits per-bar values for diff against the
+// others.
+//
+// All three engines (PineForge, PyneCore, PineTS) are expected to
+// match these to within 1e-9 absolute / 1e-6 relative on every bar.
+// Larger drift is a runtime defect on whichever engine deviates.
+indicator("Canonical Indicators", overlay=false)
+
+ema21 = ta.ema(close, 21)
+sma21 = ta.sma(close, 21)
+rsi14 = ta.rsi(close, 14)
+atr14 = ta.atr(14)
+[macd, signal, hist] = ta.macd(close, 12, 26, 9)
+[bb_basis, bb_upper, bb_lower] = ta.bb(close, 20, 2.0)
+
+plot(ema21,    "ema21")
+plot(sma21,    "sma21")
+plot(rsi14,    "rsi14")
+plot(atr14,    "atr14")
+plot(macd,     "macd_line")
+plot(signal,   "macd_signal")
+plot(hist,     "macd_hist")
+plot(bb_basis, "bb_basis")
+plot(bb_upper, "bb_upper")
+plot(bb_lower, "bb_lower")
