@@ -1,0 +1,9 @@
+# Build artifacts produced by cmake --target bench_strategies
+strategies/**/*.dylib
+strategies/**/*.so
+strategies/**/__pycache__/
+strategies/**/_pynecore_raw_trades.csv
+strategies/**/pynecore_stats.csv
+strategies/**/strategy_pyne.toml
+strategies/**/__pycache__
+_indicators/__pycache__/
