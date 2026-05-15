@@ -24,14 +24,20 @@ using namespace pineforge;
 
 class GeneratedStrategy : public BacktestEngine {
 public:
-    bool fire = false;
-    double qty_dyn = 0.0;
+    math::Sum _ta_sum_1;
+    Series<double> cumDelta;
+    double buyVolume = 0.0;
+    double sellVolume = 0.0;
+    double volumeDelta = 0.0;
+    bool crossUp = false;
+    bool crossDown = false;
+    bool _ta_initialized_ = false;
 
-    explicit GeneratedStrategy() {
+    explicit GeneratedStrategy() : _ta_sum_1(10) {
         initial_capital_ = 1000000.0;
         default_qty_type_ = QtyType::FIXED;
         default_qty_value_ = 1.0;
-        pyramiding_ = 0;
+        pyramiding_ = 1;
         commission_type_ = CommissionType::PERCENT;
         commission_value_ = 0.0;
         slippage_ = 0;
@@ -61,13 +67,17 @@ public:
     }
 
     void on_bar(const Bar& bar) override {
-        fire = ((((_bar_dayofweek() == 2) && (_bar_hour() == 0)) && (_bar_minute() == 0)) && (signed_position_size() == 0));
-        qty_dyn = ((double)(std::round((((double)((current_equity() + open_profit(current_bar_.close))) / (double)(current_bar_.close)) * 1000))) / (double)(1000));
-        if ((fire && (qty_dyn > 0))) {
-            strategy_entry(std::string("E"), true, na<double>(), na<double>(), qty_dyn, std::string("qty = equity/close"), "", 0, -1);
+        buyVolume = (((current_bar_.close > current_bar_.open)) ? (current_bar_.volume) : (((double)((current_bar_.volume * (current_bar_.close - current_bar_.low))) / (double)(((current_bar_.high - current_bar_.low) + 0.0001)))));
+        sellVolume = (((current_bar_.close < current_bar_.open)) ? (current_bar_.volume) : (((double)((current_bar_.volume * (current_bar_.high - current_bar_.close))) / (double)(((current_bar_.high - current_bar_.low) + 0.0001)))));
+        volumeDelta = (buyVolume - sellVolume);
+        cumDelta.push((is_first_tick_ ? _ta_sum_1.compute(volumeDelta) : _ta_sum_1.recompute(volumeDelta)));
+        crossUp = ((cumDelta[0] > 0) && (cumDelta[1] <= 0));
+        crossDown = ((cumDelta[0] < 0) && (cumDelta[1] >= 0));
+        if ((crossUp && (signed_position_size() == 0))) {
+            strategy_entry(std::string("L"), true, na<double>(), na<double>(), 1, std::string("cumDelta cross-up"), "", 0, -1);
         }
-        if (((signed_position_size() > 0) && (bar_index_ > open_trade_entry_bar_index(0)))) {
-            strategy_close(std::string("E"), std::string("next-bar flatten"), na<double>(), na<double>(), false);
+        if ((crossDown && (signed_position_size() > 0))) {
+            strategy_close(std::string("L"), std::string("cumDelta cross-down exit"), na<double>(), na<double>(), false);
         }
     }
 
