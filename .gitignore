@@ -7,3 +7,4 @@ strategies/**/pynecore_stats.csv
 strategies/**/strategy_pyne.toml
 strategies/**/__pycache__
 _indicators/__pycache__/
+**/__pycache__/
