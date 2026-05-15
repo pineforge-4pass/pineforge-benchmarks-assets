@@ -1,39 +1,33 @@
-"""@pyne
-Hand-port of strategies/09-kkb-kalman/strategy.pine for PyneCore.
-
-Pine source: "Kinetic Kalman Breakout (KKB)" — runs a hand-rolled
-2-state Kalman filter over the close-price series, then issues
-breakouts when close crosses an MAE-scaled band around the filter
-output.
-
-Persistent state (Kalman position/velocity, 2x2 covariance matrix) is
-maintained via PyneCore's `Persistent[float]` annotation, which mirrors
-Pine's `var float`.
 """
-from pynecore import Persistent
-from pynecore.lib import script, input, ta, math, strategy, barstate, close
+@pyne
+
+This code was compiled by PyneComp v6.0.31 — the Pine Script to Python compiler.
+Run with open-source PyneCore: https://pynecore.org
+Compile Pine Scripts online at PyneSys: https://pynesys.io
+"""
+from pynecore.lib import (
+    barstate, close, color, currency, input, math, na, plot, script,
+    strategy, ta
+)
+from pynecore.types import Persistent
 
 
-@script.strategy("Kinetic Kalman Breakout", shorttitle="KKB", overlay=True,
-                 margin_long=100, margin_short=100)
+@script.strategy("Kinetic Kalman Breakout", shorttitle="KKB", overlay=True, margin_long=100, margin_short=100, use_bar_magnifier=False, initial_capital=1000000, currency=currency.USD, process_orders_on_close=False, pyramiding=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, default_qty_type=strategy.fixed, default_qty_value=1)
 def main(
-    process_noise_pos: float = input.float(0.05, minval=0.001,
-                                            title="Base Process Noise (Position)"),
-    process_noise_vel: float = input.float(0.0001, minval=0.00001,
-                                            title="Base Process Noise (Velocity)"),
-    measurement_noise: float = input.float(250, minval=1,
-                                            title="Base Measurement Noise (R)"),
-    band_lookback: int = input.int(200, title="Band Lookback for Abs Error"),
-    band_multiplier: float = input.float(2.6, title="Band Multiplier", step=0.1),
-    _atr_mult_ref: float = input.float(7.88, minval=0.1, step=0.1,
-                                        title="ATR Trailing Multiplier (Ref)"),
+    processNoisePos=input.float(0.05, minval=0.001, title='Base Process Noise (Position)'),
+    processNoiseVel=input.float(0.0001, minval=1e-05, title='Base Process Noise (Velocity)'),
+    measurementNoise=input.float(250, minval=1, title='Base Measurement Noise (R)'),
+    bandLookback=input.int(200, title='Band Lookback for Abs Error'),
+    bandMultiplier=input.float(2.6, title='Band Multiplier', step=0.1),
+    m=input.float(7.88, minval=0.1, step=0.1, title='ATR Trailing Multiplier (Ref)')
 ):
-    x_p: Persistent[float] = float("nan")
-    x_v: Persistent[float] = float("nan")
-    p00: Persistent[float] = float("nan")
-    p01: Persistent[float] = float("nan")
-    p10: Persistent[float] = float("nan")
-    p11: Persistent[float] = float("nan")
+
+    x_p: Persistent[float] = na(float)
+    x_v: Persistent[float] = na(float)
+    p00: Persistent[float] = na(float)
+    p01: Persistent[float] = na(float)
+    p10: Persistent[float] = na(float)
+    p11: Persistent[float] = na(float)
 
     if barstate.isfirst:
         x_p = close
@@ -43,37 +37,35 @@ def main(
         p10 = 0.0
         p11 = 1.0
 
-    # PREDICT
-    p_prime = x_p + x_v
-    v_prime = x_v
+    pPrime = x_p + x_v
+    vPrime = x_v
 
-    a00 = p00 + p10
-    a01 = p01 + p11
-    a10 = p10
-    a11 = p11
+    a00 = 1 * p00 + 1 * p10
+    a01 = 1 * p01 + 1 * p11
+    a10 = 0 * p00 + 1 * p10
+    a11 = 0 * p01 + 1 * p11
 
-    p00_ = a00 + a01
-    p01_ = a01
-    p10_ = a10 + a11
-    p11_ = a11
+    p00_ = a00 * 1 + a01 * 1
+    p01_ = a00 * 0 + a01 * 1
+    p10_ = a10 * 1 + a11 * 1
+    p11_ = a10 * 0 + a11 * 1
 
-    p00_ += process_noise_pos
-    p11_ += process_noise_vel
+    p00_ += processNoisePos
+    p11_ += processNoiseVel
 
-    # UPDATE
     z = close
-    y = z - p_prime
-    s = p00_ + measurement_noise
-    k0 = p00_ / s
-    k1 = p10_ / s
+    y = z - pPrime
+    S = p00_ + measurementNoise
+    K0 = p00_ / S
+    K1 = p10_ / S
 
-    x_p_upd = p_prime + k0 * y
-    x_v_upd = v_prime + k1 * y
+    x_p_upd = pPrime + K0 * y
+    x_v_upd = vPrime + K1 * y
 
-    i00 = 1 - k0
-    i01 = 0.0
-    i10 = -k1
-    i11 = 1.0
+    i00 = 1 - K0
+    i01: float = 0.0
+    i10 = -K1
+    i11: float = 1.0
 
     pp00 = i00 * p00_ + i01 * p10_
     pp01 = i00 * p01_ + i01 * p11_
@@ -87,19 +79,27 @@ def main(
     p10 = pp10
     p11 = pp11
 
-    kalman_price = x_p
+    kalmanPrice = x_p
 
-    # BANDS
-    abs_diff = math.abs(close - kalman_price)
-    mae = ta.sma(abs_diff, band_lookback)
-    upper_band = kalman_price + band_multiplier * mae
-    lower_band = kalman_price - band_multiplier * mae
+    absDiff = math.abs(close - kalmanPrice)
+    mae = ta.sma(absDiff, bandLookback)
+    upperBand = kalmanPrice + bandMultiplier * mae
+    lowerBand = kalmanPrice - bandMultiplier * mae
 
-    # SIGNALS (reversals)
-    bull_signal = ta.crossover(close, upper_band)
-    bear_signal = ta.crossunder(close, lower_band)
+    bullSignal = ta.crossover(close, upperBand)
+    bearSignal = ta.crossunder(close, lowerBand)
 
-    if bull_signal:
-        strategy.entry("Long", strategy.long)
-    if bear_signal:
-        strategy.entry("Short", strategy.short)
+    if bullSignal:
+        strategy.entry('Long', strategy.long)
+
+    if bearSignal:
+        strategy.entry('Short', strategy.short)
+
+    plot(kalmanPrice, color=color.new(color.blue, 0), title='Kalman Filter')
+    plot(upperBand, color=color.new(color.gray, 60), title='Upper Band')
+    plot(lowerBand, color=color.new(color.gray, 60), title='Lower Band')
+
+
+if __name__ == "__main__":
+    from pynecore.standalone import run
+    run(__file__)
