@@ -305,7 +305,7 @@ public:
             _ta_initialized_ = true;
         }
         bb_src = get_input_double("BB Source", current_bar_.close);
-        testPeriodStart = [&](){ struct tm t = {}; t.tm_year = (int)(testStartYear) - 1900; t.tm_mon = (int)(testStartMonth) - 1; t.tm_mday = (int)(testStartDay); t.tm_hour = (int)(0); t.tm_min = (int)(0); t.tm_sec = (int)(0); return (int64_t)timegm(&t) * 1000; }();
+        testPeriodStart = [&]() -> int64_t { int _yr = (testStartYear); int _mo = (testStartMonth); int _dy = (testStartDay); int _hr = (0); int _min = (0); int _sc = (0); static thread_local int _last_yr = -1, _last_mo = -1, _last_dy = -1, _last_hr = -1, _last_min = -1, _last_sc = -1; static thread_local int64_t _last_res = -1; if (_last_res != -1 && _last_yr == _yr && _last_mo == _mo && _last_dy == _dy && _last_hr == _hr && _last_min == _min && _last_sc == _sc) { return _last_res; } struct tm t = {}; t.tm_year = _yr - 1900; t.tm_mon = _mo - 1; t.tm_mday = _dy; t.tm_hour = _hr; t.tm_min = _min; t.tm_sec = _sc; int64_t _res = (int64_t)timegm(&t) * 1000; _last_yr = _yr; _last_mo = _mo; _last_dy = _dy; _last_hr = _hr; _last_min = _min; _last_sc = _sc; _last_res = _res; return _res; }();
         pivot_high = (is_first_tick_ ? _ta_pivothigh_1.compute(current_bar_.high) : _ta_pivothigh_1.recompute(current_bar_.high));
         pivot_low = (is_first_tick_ ? _ta_pivotlow_2.compute(current_bar_.low) : _ta_pivotlow_2.recompute(current_bar_.low));
         if (!(is_na(pivot_high))) {
