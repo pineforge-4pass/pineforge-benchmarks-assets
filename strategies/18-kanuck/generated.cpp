@@ -22,6 +22,83 @@
 
 using namespace pineforge;
 
+// --- syminfo derivation helpers (PineForge G2) ---
+static inline std::string _pf_derive_prefix(const std::string& tickerid) {
+    std::size_t colon = tickerid.find(':');
+    return (colon == std::string::npos) ? tickerid : tickerid.substr(0, colon);
+}
+
+static inline std::string _pf_derive_main_tickerid(const std::string& tickerid) {
+    // Strip trailing digits (optionally followed by '!') from the symbol part.
+    // e.g. "CME_MINI:ES1!" -> "CME_MINI:ES", "NYMEX:CL2!" -> "NYMEX:CL"
+    std::string result = tickerid;
+    std::size_t colon = result.find(':');
+    std::size_t start = (colon == std::string::npos) ? 0 : colon + 1;
+    // Find end of base symbol (strip trailing digits + optional '!')
+    std::size_t end = result.size();
+    if (end > start && result[end - 1] == '!') {
+        --end;
+    }
+    while (end > start && std::isdigit((unsigned char)result[end - 1])) {
+        --end;
+    }
+    return result.substr(0, end);
+}
+
+static inline std::string _pf_derive_country(const std::string& tickerid) {
+    // Lookup country by exchange prefix (text before ':').
+    std::size_t colon = tickerid.find(':');
+    std::string prefix = (colon == std::string::npos)
+        ? tickerid : tickerid.substr(0, colon);
+    static const std::unordered_map<std::string, std::string> _tbl = {
+        {"AMEX", "US"},
+        {"AQUIS", "UK"},
+        {"ARCA", "US"},
+        {"ASX", "AU"},
+        {"B3", "BR"},
+        {"BINANCE", "GLOBAL"},
+        {"BITMEX", "GLOBAL"},
+        {"BMF", "BR"},
+        {"BMFBOVESPA", "BR"},
+        {"BSE", "IN"},
+        {"BYBIT", "GLOBAL"},
+        {"CBOE", "US"},
+        {"CBOT", "US"},
+        {"CME", "US"},
+        {"CME_MINI", "US"},
+        {"COINBASE", "US"},
+        {"COMEX", "US"},
+        {"DERIBIT", "GLOBAL"},
+        {"EURONEXT", "EU"},
+        {"HKEX", "HK"},
+        {"JSE", "ZA"},
+        {"KOSPI", "KR"},
+        {"KRAKEN", "GLOBAL"},
+        {"KRX", "KR"},
+        {"LSE", "UK"},
+        {"MOEX", "RU"},
+        {"NASDAQ", "US"},
+        {"NSE", "IN"},
+        {"NYMEX", "US"},
+        {"NYSE", "US"},
+        {"OKX", "GLOBAL"},
+        {"OSE", "JP"},
+        {"OTC", "US"},
+        {"SGX", "SG"},
+        {"SIX", "CH"},
+        {"SSE", "CN"},
+        {"SZSE", "CN"},
+        {"TSE", "JP"},
+        {"TSX", "CA"},
+        {"UPBIT", "KR"},
+        {"VENTURE", "CA"},
+        {"XETRA", "DE"}
+    };
+    auto it = _tbl.find(prefix);
+    return (it != _tbl.end()) ? it->second : na<std::string>();
+}
+// --- end syminfo derivation helpers ---
+
 class GeneratedStrategy : public BacktestEngine {
 public:
     math::Sum _ta_sum_1;
@@ -208,6 +285,7 @@ public:
     std::string _act_t = std::string("");
     bool _var_initialized = false;
     bool _ta_initialized_ = false;
+    bool _inputs_initialized_ = false;
 
     explicit GeneratedStrategy() : _ta_sum_1(10), _ta_sma_2(20), _ta_sma_3(20), _ta_ema_4(40), _ta_ema_5(20), _ta_ema_6(3), _ta_ema_7(20), _ta_ema_8(5), _ta_ema_9(3), _ta_sum_10(10), original_qty(na<double>()), peak_sigma(0), current_pct(1), bars_since_adj(0), entry_close(na<double>()), pos_age(0), dash(na<double>()) {
         initial_capital_ = 1000000.0;
@@ -251,6 +329,40 @@ public:
         } else {
             if (is_first_tick_) kama.push(kama[0]);
         }
+        if (!_inputs_initialized_) {
+            input_direction = get_input_string("Trade Direction", std::string("Long"));
+            input_trade_mode = get_input_string("Trade Behaviour", std::string("Hold"));
+            input_use_dev_gate = get_input_bool("Band Deviation Gate", true);
+            input_max_dev = get_input_double("Max Entry Deviation (σ)", 1.5);
+            input_trim_start = get_input_double("Trim Start (σ)", 1.0);
+            input_trim_step = get_input_double("Trim Step (%)", 20.0);
+            input_min_hold = get_input_double("Min Hold (%)", 25.0);
+            input_reload_buf = get_input_double("Reload Buffer", 0.5);
+            input_trend_shift = get_input_double("Trend Quality Shift (σ)", 0.5);
+            input_cooldown = get_input_int("Cooldown (bars)", 2);
+            input_er_len = get_input_int("ER Length", 10);
+            input_fast_period = get_input_int("Fast Period", 2);
+            input_slow_period = get_input_int("Slow Period", 30);
+            input_dev_len = get_input_int("Deviation Length", 20);
+            input_band_mult = get_input_double("Band Multiplier", 2.0);
+            input_col_bull = get_input_int("Trending Up", 0);
+            input_col_bear = get_input_int("Trending Down", 0);
+            input_col_neutral = get_input_int("Coiling", 0);
+            input_col_band = get_input_int("Bands", 0);
+            input_kama_width = get_input_int("Fair Value Line Width", 3);
+            input_show_dash = get_input_bool("Show Dashboard", true);
+            input_dash_pos = get_input_string("Position", std::string("Top Right"));
+            input_dash_size = get_input_string("Text Size", std::string("Small"));
+            input_show_bands = get_input_bool("Show Bands", true);
+            input_show_sigs = get_input_bool("Show Signals", true);
+            input_th_accent = get_input_int("Accent", 0);
+            input_th_label = get_input_int("Labels", 0);
+            input_th_hdr_bg = get_input_int("Header Background", 0);
+            input_th_bg1 = get_input_int("Row Background", 0);
+            input_th_bg2 = get_input_int("Alt Background", 0);
+            input_th_border = get_input_int("Border", 0);
+            _inputs_initialized_ = true;
+        }
         if (!_ta_initialized_) {
             _ta_sum_1 = math::Sum(get_input_int("ER Length", 10));
             _ta_sma_2 = ta::SMA(get_input_int("Deviation Length", 20));
@@ -261,37 +373,6 @@ public:
             _ta_sum_10 = math::Sum(get_input_int("ER Length", 10));
             _ta_initialized_ = true;
         }
-        input_direction = get_input_string("Trade Direction", std::string("Long"));
-        input_trade_mode = get_input_string("Trade Behaviour", std::string("Hold"));
-        input_use_dev_gate = get_input_bool("Band Deviation Gate", true);
-        input_max_dev = get_input_double("Max Entry Deviation (σ)", 1.5);
-        input_trim_start = get_input_double("Trim Start (σ)", 1.0);
-        input_trim_step = get_input_double("Trim Step (%)", 20.0);
-        input_min_hold = get_input_double("Min Hold (%)", 25.0);
-        input_reload_buf = get_input_double("Reload Buffer", 0.5);
-        input_trend_shift = get_input_double("Trend Quality Shift (σ)", 0.5);
-        input_cooldown = get_input_int("Cooldown (bars)", 2);
-        input_er_len = get_input_int("ER Length", 10);
-        input_fast_period = get_input_int("Fast Period", 2);
-        input_slow_period = get_input_int("Slow Period", 30);
-        input_dev_len = get_input_int("Deviation Length", 20);
-        input_band_mult = get_input_double("Band Multiplier", 2.0);
-        input_col_bull = get_input_int("Trending Up", 0);
-        input_col_bear = get_input_int("Trending Down", 0);
-        input_col_neutral = get_input_int("Coiling", 0);
-        input_col_band = get_input_int("Bands", 0);
-        input_kama_width = get_input_int("Fair Value Line Width", 3);
-        input_show_dash = get_input_bool("Show Dashboard", true);
-        input_dash_pos = get_input_string("Position", std::string("Top Right"));
-        input_dash_size = get_input_string("Text Size", std::string("Small"));
-        input_show_bands = get_input_bool("Show Bands", true);
-        input_show_sigs = get_input_bool("Show Signals", true);
-        input_th_accent = get_input_int("Accent", 0);
-        input_th_label = get_input_int("Labels", 0);
-        input_th_hdr_bg = get_input_int("Header Background", 0);
-        input_th_bg1 = get_input_int("Row Background", 0);
-        input_th_bg2 = get_input_int("Alt Background", 0);
-        input_th_border = get_input_int("Border", 0);
         ER_LEN = input_er_len;
         FAST_PERIOD = input_fast_period;
         SLOW_PERIOD = input_slow_period;

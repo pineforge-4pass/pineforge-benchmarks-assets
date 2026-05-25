@@ -22,6 +22,83 @@
 
 using namespace pineforge;
 
+// --- syminfo derivation helpers (PineForge G2) ---
+static inline std::string _pf_derive_prefix(const std::string& tickerid) {
+    std::size_t colon = tickerid.find(':');
+    return (colon == std::string::npos) ? tickerid : tickerid.substr(0, colon);
+}
+
+static inline std::string _pf_derive_main_tickerid(const std::string& tickerid) {
+    // Strip trailing digits (optionally followed by '!') from the symbol part.
+    // e.g. "CME_MINI:ES1!" -> "CME_MINI:ES", "NYMEX:CL2!" -> "NYMEX:CL"
+    std::string result = tickerid;
+    std::size_t colon = result.find(':');
+    std::size_t start = (colon == std::string::npos) ? 0 : colon + 1;
+    // Find end of base symbol (strip trailing digits + optional '!')
+    std::size_t end = result.size();
+    if (end > start && result[end - 1] == '!') {
+        --end;
+    }
+    while (end > start && std::isdigit((unsigned char)result[end - 1])) {
+        --end;
+    }
+    return result.substr(0, end);
+}
+
+static inline std::string _pf_derive_country(const std::string& tickerid) {
+    // Lookup country by exchange prefix (text before ':').
+    std::size_t colon = tickerid.find(':');
+    std::string prefix = (colon == std::string::npos)
+        ? tickerid : tickerid.substr(0, colon);
+    static const std::unordered_map<std::string, std::string> _tbl = {
+        {"AMEX", "US"},
+        {"AQUIS", "UK"},
+        {"ARCA", "US"},
+        {"ASX", "AU"},
+        {"B3", "BR"},
+        {"BINANCE", "GLOBAL"},
+        {"BITMEX", "GLOBAL"},
+        {"BMF", "BR"},
+        {"BMFBOVESPA", "BR"},
+        {"BSE", "IN"},
+        {"BYBIT", "GLOBAL"},
+        {"CBOE", "US"},
+        {"CBOT", "US"},
+        {"CME", "US"},
+        {"CME_MINI", "US"},
+        {"COINBASE", "US"},
+        {"COMEX", "US"},
+        {"DERIBIT", "GLOBAL"},
+        {"EURONEXT", "EU"},
+        {"HKEX", "HK"},
+        {"JSE", "ZA"},
+        {"KOSPI", "KR"},
+        {"KRAKEN", "GLOBAL"},
+        {"KRX", "KR"},
+        {"LSE", "UK"},
+        {"MOEX", "RU"},
+        {"NASDAQ", "US"},
+        {"NSE", "IN"},
+        {"NYMEX", "US"},
+        {"NYSE", "US"},
+        {"OKX", "GLOBAL"},
+        {"OSE", "JP"},
+        {"OTC", "US"},
+        {"SGX", "SG"},
+        {"SIX", "CH"},
+        {"SSE", "CN"},
+        {"SZSE", "CN"},
+        {"TSE", "JP"},
+        {"TSX", "CA"},
+        {"UPBIT", "KR"},
+        {"VENTURE", "CA"},
+        {"XETRA", "DE"}
+    };
+    auto it = _tbl.find(prefix);
+    return (it != _tbl.end()) ? it->second : na<std::string>();
+}
+// --- end syminfo derivation helpers ---
+
 class GeneratedStrategy : public BacktestEngine {
 public:
     ta::ATR _ta_atr_1;
@@ -145,6 +222,7 @@ public:
     bool nearSellSignal = false;
     bool _var_initialized = false;
     bool _ta_initialized_ = false;
+    bool _inputs_initialized_ = false;
 
     explicit GeneratedStrategy() : _ta_atr_1(14), _ta_pivothigh_2(1, 1), _ta_pivotlow_3(1, 1), _ta_highest_4(20), _ta_lowest_5(20), _ta_atr_6(14), _ta_atr_7(14), _ta_sma_8(5), _ta_change_9(5), _ta_sma_10(20), _ta_atr_11(14), supertrend(na<double>()), direction(1), entryPrice(na<double>()), exitPrice(na<double>()), positionActive(false), currentDirection(0), lastPivotHigh(na<double>()), lastPivotLow(na<double>()), pivotLength(5), keyResistance(na<double>()), keySupport(na<double>()), nearbyResistance(na<double>()), nearbySupport(na<double>()), recentHigh(na<double>()), recentLow(na<double>()), anchorPrice(na<double>()), anchorBar(na<double>()), velocity(0), barCount(0), profit(na<double>()), currentProfit(na<double>()), last_alert_price(0), accumulated_profit(0) {
         initial_capital_ = 1000000.0;
@@ -188,17 +266,28 @@ public:
             _var_initialized = true;
         } else {
         }
+        if (!_inputs_initialized_) {
+            atrLength = get_input_int("ATR Length", 14);
+            atrMult = get_input_double("ATR Multiplier", 2.0);
+            radiusStrength = get_input_double("Radius Strength", 0.002);
+            smoothness = get_input_int("Smoothness", 5);
+            upColor = get_input_int("Up Trend", pine_color::green);
+            dnColor = get_input_int("Down Trend", pine_color::red);
+            showTable = get_input_bool("顯示智能提示", false);
+            tp_alert_enabled = get_input_bool("啟用盈利通知", false);
+            tp_alert = get_input_int("盈利通知間距", 0);
+            tp_enabled = get_input_bool("啟用自動停利出場", false);
+            tp_distance = get_input_int("自動停利價格", 100);
+            sl_enabled = get_input_bool("啟用自動停損出場", false);
+            sl_distance = get_input_int("自動停損價格", 100);
+            tpsl_percentage = get_input_int("自動停利停損百分比(%)", 50);
+            _inputs_initialized_ = true;
+        }
         if (!_ta_initialized_) {
             _ta_atr_1 = ta::ATR(get_input_int("ATR Length", 14));
             _ta_sma_8 = ta::SMA(get_input_int("Smoothness", 5));
             _ta_initialized_ = true;
         }
-        atrLength = get_input_int("ATR Length", 14);
-        atrMult = get_input_double("ATR Multiplier", 2.0);
-        radiusStrength = get_input_double("Radius Strength", 0.002);
-        smoothness = get_input_int("Smoothness", 5);
-        upColor = get_input_int("Up Trend", pine_color::green);
-        dnColor = get_input_int("Down Trend", pine_color::red);
         atr = (is_first_tick_ ? _ta_atr_1.compute(current_bar_.high, current_bar_.low, current_bar_.close) : _ta_atr_1.recompute(current_bar_.high, current_bar_.low, current_bar_.close));
         src = ((current_bar_.high + current_bar_.low) / 2.0);
         upperBand = (src + (atrMult * atr));
@@ -326,7 +415,6 @@ public:
         curvedBand = (is_first_tick_ ? _ta_sma_8.compute(supertrend) : _ta_sma_8.recompute(supertrend));
         trendColor = (((direction == 1)) ? (upColor) : (dnColor));
         outerBand = (((direction == 1)) ? ((curvedBand + atr)) : ((curvedBand - atr)));
-        showTable = get_input_bool("顯示智能提示", false);
         if (((barstate_islast_ || is_last_tick_) && showTable)) {
             trendStatusText = (((direction == 1)) ? (std::string("多空 ●")) : ((((direction == (-1))) ? (std::string("多空 ●")) : (std::string("無趨勢")))));
             trendStatusColor = (((direction == 1)) ? (pine_color::green) : ((((direction == (-1))) ? (pine_color::red) : (pine_color::gray))));
@@ -468,13 +556,6 @@ public:
                 pivotInfo = std::string("🎯 阻力: 待確認n🛡️ 支撐: 待確認");
             }
         }
-        tp_alert_enabled = get_input_bool("啟用盈利通知", false);
-        tp_alert = get_input_int("盈利通知間距", 0);
-        tp_enabled = get_input_bool("啟用自動停利出場", false);
-        tp_distance = get_input_int("自動停利價格", 100);
-        sl_enabled = get_input_bool("啟用自動停損出場", false);
-        sl_distance = get_input_int("自動停損價格", 100);
-        tpsl_percentage = get_input_int("自動停利停損百分比(%)", 50);
         buySignal = (trendChanged && (direction == 1));
         sellSignal = (trendChanged && (direction == (-1)));
         if ((buySignal && (signed_position_size() <= 0))) {
