@@ -40,6 +40,8 @@ def main(
     plot(hh, 'Highest', color=color.green)
     plot(ll, 'Lowest', color=color.red)
     plot(midChan, 'Mid', color=color.gray)
+    plot(strategy.position_size * 1.0, 'pos_size')
+    plot(maVal, 'maVal')
 
 
 if __name__ == "__main__":

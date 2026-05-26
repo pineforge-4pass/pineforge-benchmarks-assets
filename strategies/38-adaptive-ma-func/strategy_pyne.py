@@ -44,6 +44,8 @@ def main(
         strategy.entry('Short', strategy.short)
 
     plot(kama, 'KAMA', color=color.green if kamaUp else color.red, linewidth=2)
+    plot(er, 'er')
+    plot(sc, 'sc')
 
 
 if __name__ == "__main__":

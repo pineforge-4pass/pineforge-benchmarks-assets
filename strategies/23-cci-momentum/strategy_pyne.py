@@ -25,12 +25,18 @@ def main(
     if shortCond:
         strategy.entry('Short', strategy.short)
 
-    if strategy.position_size > 0 and ta.crossunder(cciVal, 0):
+    cond_cross_under = ta.crossunder(cciVal, 0)
+    if strategy.position_size > 0 and cond_cross_under:
         strategy.close('Long')
-    if strategy.position_size < 0 and ta.crossover(cciVal, 0):
+
+    cond_cross_over = ta.crossover(cciVal, 0)
+    if strategy.position_size < 0 and cond_cross_over:
         strategy.close('Short')
 
     plot(cciVal, 'CCI', color=color.blue)
+    plot(strategy.position_size * 1.0, 'pos_size')
+    plot(ta.crossover(cciVal, 0) * 1.0, 'crossover0')
+    plot(ta.crossunder(cciVal, 0) * 1.0, 'crossunder0')
     hline(obLevel, 'Overbought', color=color.red)
     hline(osLevel, 'Oversold', color=color.green)
     hline(0, 'Zero', color=color.gray)
