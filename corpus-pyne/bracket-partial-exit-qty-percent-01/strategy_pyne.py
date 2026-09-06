@@ -1,0 +1,28 @@
+"""
+@pyne edge
+
+This code was compiled by PyneComp v6.0.66 — the Pine Script to Python compiler.
+Run with open-source PyneCore: https://pynecore.org
+Compile Pine Scripts online at PyneSys: https://pynesys.io
+"""
+from pynecore.lib import hour, minute, script, strategy
+
+
+@script.strategy("PF TV golden 41 - partial qty percent", shorttitle="PF_G41_PARTIAL", overlay=True, initial_capital=1000000, commission_type=strategy.commission.percent, commission_value=0, slippage=0, default_qty_type=strategy.fixed, default_qty_value=2, pyramiding=1, process_orders_on_close=False)
+def main():
+    enterLong = hour == 1 and minute == 15 and (strategy.position_size == 0)
+    if enterLong:
+        strategy.entry('L', strategy.long, qty=2, comment='two lots')
+
+    if strategy.position_size > 0:
+        entry = strategy.position_avg_price
+        strategy.exit('HALF_TP', 'L', limit=entry * 1.003, qty_percent=50, comment='half tp')
+        strategy.exit('REST_SL', 'L', stop=entry * 0.994, comment='rest stop')
+
+    if strategy.position_size > 0 and hour == 9 and (minute == 15):
+        strategy.close('L', comment='timeout')
+
+
+if __name__ == "__main__":
+    from pynecore.standalone import run
+    run(__file__)

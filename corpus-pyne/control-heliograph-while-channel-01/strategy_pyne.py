@@ -1,0 +1,62 @@
+"""
+@pyne edge
+
+This code was compiled by PyneComp v6.0.66 — the Pine Script to Python compiler.
+Run with open-source PyneCore: https://pynecore.org
+Compile Pine Scripts online at PyneSys: https://pynesys.io
+"""
+from pynecore.lib import bar_index, close, color, input, na, plot, script, strategy, ta
+from pynecore.types import Persistent
+
+
+@script.strategy("PineForge — Heliograph While Channel", overlay=True, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=2, pyramiding=0, commission_type=strategy.commission.percent, commission_value=0.05, slippage=1, margin_long=100, margin_short=100, process_orders_on_close=False, calc_on_order_fills=False)
+def main(
+    channelLength=input.int(28, "Channel Length", minval=5, maxval=120, group="Signal"),
+    bandWidth=input.float(1.25, "Band Width", minval=0.25, step=0.05, group="Signal"),
+    atrLength=input.int(17, "ATR Length", minval=2, group="Risk"),
+    stopAtr=input.float(2.4, "Stop ATR", minval=0.5, step=0.1, group="Risk"),
+    maximumHoldBars=input.int(160, "Maximum Hold Bars", minval=8, group="Risk")
+):
+    weightedSum: float = 0.0
+    weightTotal: float = 0.0
+    cursor: int = 0
+    while cursor < channelLength:
+        sample = close[cursor]
+        weight = channelLength - cursor
+        if not na(sample):
+            weightedSum += sample * weight
+            weightTotal += weight
+        cursor += 1
+
+    center = weightedSum / weightTotal if weightTotal > 0 else na
+    dispersion = ta.stdev(close, channelLength)
+    upperBand = center + dispersion * bandWidth
+    atrValue = ta.atr(atrLength)
+
+    openedAt: Persistent[int] = na(int)
+    if strategy.position_size > 0 and strategy.position_size[1] == 0:
+        openedAt = bar_index
+
+    entrySignal = ta.crossover(close, upperBand)
+    exitSignal = ta.crossunder(close, center)
+    holdExpired = strategy.position_size > 0 and (not na(openedAt)) and (bar_index - openedAt >= maximumHoldBars)
+
+    if entrySignal:
+        strategy.entry('Heliograph Long', strategy.long)
+
+    if strategy.position_size > 0 and (exitSignal or holdExpired):
+        strategy.close('Heliograph Long', comment='Maximum hold' if holdExpired else 'Centerline exit')
+
+    if strategy.position_size > 0:
+        strategy.exit('Heliograph Guard', from_entry='Heliograph Long', stop=strategy.position_avg_price - atrValue * stopAtr)
+
+    if strategy.position_size == 0:
+        openedAt = na
+
+    plot(center, 'Weighted Center', color=color.yellow)
+    plot(upperBand, 'Upper Band', color=color.orange)
+
+
+if __name__ == "__main__":
+    from pynecore.standalone import run
+    run(__file__)
