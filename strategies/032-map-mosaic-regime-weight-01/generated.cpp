@@ -329,11 +329,6 @@ public:
     }
 
     void on_source_bar(const Bar& bar) override {
-        if (!_var_initialized) {
-            regimeWeight = PineMap<std::string, double>::new_();
-            _var_initialized = true;
-        } else {
-        }
         if (!_inputs_initialized_) {
             centerLength = get_input_int("Center EMA", 33);
             atrLength = get_input_int("ATR Length", 18);
@@ -341,12 +336,17 @@ public:
             stopAtr = get_input_double("Base Stop ATR", 2.6);
             _inputs_initialized_ = true;
         }
+        if (!_var_initialized) {
+            regimeWeight = PineMap<std::string, double>::new_();
+            _var_initialized = true;
+        } else {
+        }
         if (!_ta_initialized_) {
             _ta_ema_1 = ta::EMA(get_input_int("Center EMA", 33));
             _ta_atr_2 = ta::ATR(get_input_int("ATR Length", 18));
             _ta_initialized_ = true;
         }
-        if ((bar_index_ == 0)) {
+        if ([&](){ auto _pf_bool_v = ((bar_index_ == 0)); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }()) {
             [&](auto&& __pf_map_receiver_0)->decltype(auto){ return [&](auto&& __pf_map_param_arg_0)->decltype(auto){ return [&](auto&& __pf_map_param_arg_1)->decltype(auto){ return __pf_map_receiver_0.put(__pf_map_param_arg_0, __pf_map_param_arg_1); }((0.85)); }((std::string("calm"))); }((regimeWeight));
             [&](auto&& __pf_map_receiver_1)->decltype(auto){ return [&](auto&& __pf_map_param_arg_2)->decltype(auto){ return [&](auto&& __pf_map_param_arg_3)->decltype(auto){ return __pf_map_receiver_1.put(__pf_map_param_arg_2, __pf_map_param_arg_3); }((1.15)); }((std::string("active"))); }((regimeWeight));
         }
@@ -374,8 +374,8 @@ public:
         _precalc__ta_ema_1.resize(n);
         _precalc__ta_atr_2.resize(n);
 
-        _ta_ema_1 = ta::EMA(33);
-        _ta_atr_2 = ta::ATR(18);
+        _ta_ema_1 = ta::EMA(get_input_int("Center EMA", 33));
+        _ta_atr_2 = ta::ATR(get_input_int("ATR Length", 18));
 
 
         for (int i = 0; i < n; ++i) {
@@ -396,8 +396,8 @@ public:
             _precalc__ta_atr_2[i] = _ta_atr_2.compute(bars[i].high, bars[i].low, bars[i].close, (i > 0 ? bars[i - 1].close : na<double>()));
         }
 
-        _ta_ema_1 = ta::EMA(33);
-        _ta_atr_2 = ta::ATR(18);
+        _ta_ema_1 = ta::EMA(get_input_int("Center EMA", 33));
+        _ta_atr_2 = ta::ATR(get_input_int("ATR Length", 18));
 
         _use_precalc = true;
     }

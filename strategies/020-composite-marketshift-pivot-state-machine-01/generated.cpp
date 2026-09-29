@@ -250,13 +250,13 @@ public:
     }
 
     void on_source_bar(const Bar& bar) override {
-        if (!_var_initialized) {
-            _var_initialized = true;
-        } else {
-        }
         if (!_inputs_initialized_) {
             i_pivot = get_input_int("Pivot strength (left=right)", 5);
             _inputs_initialized_ = true;
+        }
+        if (!_var_initialized) {
+            _var_initialized = true;
+        } else {
         }
         if (!_ta_initialized_) {
             _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot strength (left=right)", 5), get_input_int("Pivot strength (left=right)", 5));
@@ -294,8 +294,8 @@ public:
         _precalc__ta_pivothigh_1.resize(n);
         _precalc__ta_pivotlow_2.resize(n);
 
-        _ta_pivothigh_1 = ta::PivotHigh(5, 5);
-        _ta_pivotlow_2 = ta::PivotLow(5, 5);
+        _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot strength (left=right)", 5), get_input_int("Pivot strength (left=right)", 5));
+        _ta_pivotlow_2 = ta::PivotLow(get_input_int("Pivot strength (left=right)", 5), get_input_int("Pivot strength (left=right)", 5));
 
 
         for (int i = 0; i < n; ++i) {
@@ -316,8 +316,8 @@ public:
             _precalc__ta_pivotlow_2[i] = _ta_pivotlow_2.compute(bars[i].low);
         }
 
-        _ta_pivothigh_1 = ta::PivotHigh(5, 5);
-        _ta_pivotlow_2 = ta::PivotLow(5, 5);
+        _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot strength (left=right)", 5), get_input_int("Pivot strength (left=right)", 5));
+        _ta_pivotlow_2 = ta::PivotLow(get_input_int("Pivot strength (left=right)", 5), get_input_int("Pivot strength (left=right)", 5));
 
         _use_precalc = true;
     }

@@ -300,8 +300,8 @@ public:
         if ((([&]{ auto _pna_l = (signed_position_size()); auto _pna_r = (0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && (_pfc_eq); }()) && enterLong)) {
             strategy_entry(std::string("Torque Long"), true, na<double>(), na<double>(), na<double>(), "");
         } else
-        if ((([&]{ auto _pna_l = (signed_position_size()); auto _pna_r = (0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }()) && (momentumEnded || regimeEnded))) {
-            strategy_close(std::string("Torque Long"), ((momentumEnded) ? (std::string("Momentum ended")) : (std::string("Regime ended"))), na<double>(), na<double>(), false, 133143986195ULL);
+        if ((([&]{ auto _pna_l = (signed_position_size()); auto _pna_r = (0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }()) && ([&](){ auto _pf_bool_v = (momentumEnded); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }() || regimeEnded))) {
+            strategy_close(std::string("Torque Long"), (([&](){ auto _pf_bool_v = (momentumEnded); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }()) ? (std::string("Momentum ended")) : (std::string("Regime ended"))), na<double>(), na<double>(), false, 133143986195ULL);
         }
     }
 
@@ -312,8 +312,8 @@ public:
         _precalc__ta_tsi_1.resize(n);
         _precalc__ta_ema_3.resize(n);
 
-        _ta_tsi_1 = ta::TSI(14, 29);
-        _ta_ema_3 = ta::EMA(68);
+        _ta_tsi_1 = ta::TSI(get_input_int("TSI Short Length", 14), get_input_int("TSI Long Length", 29));
+        _ta_ema_3 = ta::EMA(get_input_int("Trend EMA Length", 68));
 
 
         for (int i = 0; i < n; ++i) {
@@ -334,8 +334,8 @@ public:
             _precalc__ta_ema_3[i] = _ta_ema_3.compute(bars[i].close);
         }
 
-        _ta_tsi_1 = ta::TSI(14, 29);
-        _ta_ema_3 = ta::EMA(68);
+        _ta_tsi_1 = ta::TSI(get_input_int("TSI Short Length", 14), get_input_int("TSI Long Length", 29));
+        _ta_ema_3 = ta::EMA(get_input_int("Trend EMA Length", 68));
 
         _use_precalc = true;
     }

@@ -10,6 +10,9 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include <charconv>
+#include <system_error>
+#include <stdexcept>
 #include <tuple>
 #include <optional>
 #include <type_traits>
@@ -27,6 +30,305 @@
 #endif
 
 using namespace pineforge;
+
+// TradingView's drawing lifetime. A deleted or collected drawing reads like a
+// na handle: every getter returns na, every setter does nothing and na() is
+// true. A new line, box or label that makes its kind's live count reach
+// max_<kind>_count + 6 deletes the oldest drawings of that kind that no var,
+// varip or history-read variable holds, until max_<kind>_count remain; one
+// held only by an array, a map, an object field, a local or a plain non-var
+// variable is collectable. Linefills are never collected.
+constexpr int _PF_DRAWING_UNBOUNDED = 2147483647;
+template <class T> struct _PFDrawingArg { using type = T; };
+template <class R, class Rec, class H, class... A>
+inline R _pf_drawing_get(R (*get)(DrawingArena<Rec>&, H, A...),
+                         typename _PFDrawingArg<DrawingArena<Rec>&>::type arena,
+                         typename _PFDrawingArg<H>::type h,
+                         typename _PFDrawingArg<A>::type... args) {
+    return arena.alive(h.id) ? get(arena, h, args...) : na<R>();
+}
+template <class Rec, class H, class... A>
+inline void _pf_drawing_set(void (*set)(DrawingArena<Rec>&, H, A...),
+                            typename _PFDrawingArg<DrawingArena<Rec>&>::type arena,
+                            typename _PFDrawingArg<H>::type h,
+                            typename _PFDrawingArg<A>::type... args) {
+    if (arena.alive(h.id)) set(arena, h, args...);
+}
+template <class Rec, class H>
+inline bool _pf_drawing_na(const DrawingArena<Rec>& arena, H h) {
+    return !arena.alive(h.id);
+}
+template <class Rec>
+inline void _pf_collect_drawings(DrawingArena<Rec>& arena, int keep,
+                                 const int32_t* pins, std::size_t pin_count) {
+    const std::size_t excess = arena.order().size() - static_cast<std::size_t>(keep);
+    std::vector<int32_t> doomed;
+    for (int32_t id : arena.order()) {
+        if (doomed.size() == excess) break;
+        if (std::find(pins, pins + pin_count, id) == pins + pin_count) doomed.push_back(id);
+    }
+    for (int32_t id : doomed) arena.erase(id);
+}
+
+
+struct _PFTvFormatValue {
+    enum class Kind { Number, Text } kind;
+    double number = 0.0;
+    std::string text;
+
+    template <class T, std::enable_if_t<std::is_arithmetic_v<T> &&
+                                        !std::is_same_v<T, bool>, int> = 0>
+    _PFTvFormatValue(T value)
+        : kind(Kind::Number),
+          number(is_na(value) ? na<double>() : static_cast<double>(value)) {}
+    _PFTvFormatValue(bool value)
+        : kind(Kind::Text), text(value ? "true" : "false") {}
+    _PFTvFormatValue(const std::string& value)
+        : kind(Kind::Text), text(value) {}
+    _PFTvFormatValue(const char* value)
+        : kind(Kind::Text), text(value) {}
+};
+
+static std::string _pf_tv_trim(const std::string& value) {
+    const size_t first = value.find_first_not_of(" \t");
+    if (first == std::string::npos) return "";
+    const size_t last = value.find_last_not_of(" \t");
+    return value.substr(first, last - first + 1);
+}
+
+static void _pf_tv_increment_digits(std::string& digits) {
+    for (size_t i = digits.size(); i > 0; --i) {
+        if (digits[i - 1] != '9') {
+            ++digits[i - 1];
+            return;
+        }
+        digits[i - 1] = '0';
+    }
+    digits.insert(digits.begin(), '1');
+}
+
+static std::string _pf_tv_decimal(double value, int min_fraction,
+                                  int max_fraction, bool grouping,
+                                  int decimal_shift = 0) {
+    if (std::isnan(value)) return "NaN";
+    if (std::isinf(value)) return value < 0 ? "-Infinity" : "Infinity";
+    max_fraction = std::max(0, std::min(max_fraction, 15));
+    min_fraction = std::max(0, std::min(min_fraction, max_fraction));
+
+    // C++17's no-precision to_chars gives the shortest round-trip decimal
+    // spelling of this binary64 value. All subsequent scaling and rounding
+    // operate on its digits, never on a floating-point intermediate.
+    char buffer[128];
+    const auto converted = std::to_chars(buffer, buffer + sizeof buffer, value);
+    if (converted.ec != std::errc{})
+        throw std::runtime_error("shortest-decimal conversion failed");
+    std::string spelling(buffer, converted.ptr);
+    const bool negative = !spelling.empty() && spelling[0] == '-';
+    if (negative) spelling.erase(0, 1);
+
+    const size_t exponent_pos = spelling.find_first_of("eE");
+    const std::string mantissa = spelling.substr(0, exponent_pos);
+    int exponent = 0;
+    if (exponent_pos != std::string::npos) {
+        size_t i = exponent_pos + 1;
+        bool exponent_negative = false;
+        if (i < spelling.size() && (spelling[i] == '+' || spelling[i] == '-')) {
+            exponent_negative = spelling[i] == '-';
+            ++i;
+        }
+        for (; i < spelling.size(); ++i)
+            exponent = exponent * 10 + (spelling[i] - '0');
+        if (exponent_negative) exponent = -exponent;
+    }
+
+    std::string digits;
+    int decimal_point = 0;
+    bool after_point = false;
+    for (char ch : mantissa) {
+        if (ch == '.') {
+            after_point = true;
+        } else {
+            digits += ch;
+            if (!after_point) ++decimal_point;
+        }
+    }
+    decimal_point += exponent + decimal_shift;
+    const size_t leading_zeroes = digits.find_first_not_of('0');
+    if (leading_zeroes == std::string::npos) {
+        digits = "0";
+        decimal_point = 1;
+    } else {
+        digits.erase(0, leading_zeroes);
+        decimal_point -= static_cast<int>(leading_zeroes);
+    }
+
+    // The retained digits form an integer in units of 10^-max_fraction.
+    // The first discarded decimal digit decides a half-up tie exactly.
+    std::string units;
+    if (digits == "0") {
+        units = "0";
+    } else {
+        const int keep = decimal_point + max_fraction;
+        if (keep < 0) {
+            units = "0";
+        } else if (keep == 0) {
+            units = digits[0] >= '5' ? "1" : "0";
+        } else if (keep >= static_cast<int>(digits.size())) {
+            units = digits;
+            units.append(static_cast<size_t>(keep) - digits.size(), '0');
+        } else {
+            units = digits.substr(0, static_cast<size_t>(keep));
+            if (digits[static_cast<size_t>(keep)] >= '5')
+                _pf_tv_increment_digits(units);
+        }
+    }
+    const bool nonzero = units.find_first_not_of('0') != std::string::npos;
+    if (!nonzero) units = "0";
+    if (units.size() <= static_cast<size_t>(max_fraction))
+        units.insert(0, static_cast<size_t>(max_fraction) + 1 - units.size(), '0');
+    const size_t integer_size = units.size() - static_cast<size_t>(max_fraction);
+    std::string integer = units.substr(0, integer_size);
+    std::string fraction = units.substr(integer_size);
+    while (fraction.size() > static_cast<size_t>(min_fraction)
+           && fraction.back() == '0') fraction.pop_back();
+    if (grouping) {
+        std::string grouped;
+        for (size_t i = 0; i < integer_size; ++i) {
+            if (i && (integer_size - i) % 3 == 0) grouped += ',';
+            grouped += integer[i];
+        }
+        integer = grouped;
+    }
+    return (negative && nonzero ? "-" : "") + integer
+        + (fraction.empty() ? "" : "." + fraction);
+}
+
+static std::string _pf_tv_pattern(double value, const std::string& pattern) {
+    if (!std::isfinite(value)) return _pf_tv_decimal(value, 0, 0, false);
+    const std::string fmt = _pf_tv_trim(pattern);
+    const size_t dot = fmt.find('.');
+    const std::string integer = fmt.substr(0, dot);
+    const std::string fraction = dot == std::string::npos ? "" : fmt.substr(dot + 1);
+    const int max_fraction = static_cast<int>(std::count_if(
+        fraction.begin(), fraction.end(), [](char c) { return c == '0' || c == '#'; }));
+    const int min_fraction = static_cast<int>(std::count(fraction.begin(), fraction.end(), '0'));
+    const bool grouping = integer.find(',') != std::string::npos;
+    const bool percent = fmt.find('%') != std::string::npos;
+    return _pf_tv_decimal(value, min_fraction, max_fraction, grouping,
+                          percent ? 2 : 0)
+        + (percent ? "%" : "");
+}
+
+static std::string pine_str_tostring_tv(double value,
+                                        const std::string& format_mode = "",
+                                        double mintick = 0.0) {
+    if (std::isnan(value)) return "NaN";
+    if (std::isinf(value)) return value < 0 ? "-Infinity" : "Infinity";
+    if (format_mode == "mintick")
+        return pine_str_tostring(value, format_mode, mintick);
+    if (format_mode == "percent")
+        return _pf_tv_pattern(value, "#.##") + "%";
+    if (format_mode == "volume") {
+        const double magnitude = std::fabs(value);
+        int decimal_shift = 0;
+        const char* unit = "";
+        if (magnitude >= 1.0e12) { decimal_shift = -12; unit = "T"; }
+        else if (magnitude >= 1.0e9) { decimal_shift = -9; unit = "B"; }
+        else if (magnitude >= 1.0e6) { decimal_shift = -6; unit = "M"; }
+        else if (magnitude >= 1.0e3) { decimal_shift = -3; unit = "K"; }
+        return _pf_tv_decimal(value, 0, decimal_shift ? 2 : 0, false,
+                              decimal_shift) + unit;
+    }
+    return _pf_tv_pattern(value, format_mode.empty() ? "#.##########" : format_mode);
+}
+
+template <class T, std::enable_if_t<std::is_integral_v<T> &&
+                                    !std::is_same_v<T, bool>, int> = 0>
+static std::string pine_str_tostring_tv(T value,
+                                        const std::string& format_mode = "",
+                                        double mintick = 0.0) {
+    return pine_str_tostring_tv(
+        is_na(value) ? na<double>() : static_cast<double>(value),
+        format_mode, mintick);
+}
+
+static std::string _pf_tv_number_style(double value, const std::string& style) {
+    if (!std::isfinite(value)) return _pf_tv_decimal(value, 0, 0, false);
+    const std::string fmt = _pf_tv_trim(style);
+    if (fmt.empty()) return _pf_tv_pattern(value, "#,###.###");
+    if (fmt == "integer") return _pf_tv_pattern(value, "#,###");
+    if (fmt == "percent") return _pf_tv_decimal(value, 0, 0, true, 2) + "%";
+    if (fmt == "currency") {
+        const std::string digits = _pf_tv_decimal(value, 2, 2, true);
+        return digits[0] == '-' ? "-$" + digits.substr(1) : "$" + digits;
+    }
+    return _pf_tv_pattern(value, fmt);
+}
+
+static std::string pine_str_format_tv(
+    const std::string& format_string,
+    const std::vector<_PFTvFormatValue>& args) {
+    std::string result;
+    bool quoted = false;
+    for (size_t i = 0; i < format_string.size();) {
+        const char c = format_string[i];
+        if (c == '\'') {
+            if (i + 1 < format_string.size() && format_string[i + 1] == '\'') {
+                result += '\'';
+                i += 2;
+            } else {
+                quoted = !quoted;
+                ++i;
+            }
+            continue;
+        }
+        if (c != '{' || quoted) {
+            result += c;
+            ++i;
+            continue;
+        }
+        const size_t end = format_string.find('}', i + 1);
+        if (end == std::string::npos) {
+            result += format_string.substr(i);
+            break;
+        }
+        const std::string inside = format_string.substr(i + 1, end - i - 1);
+        const size_t first_comma = inside.find(',');
+        const std::string index_text = _pf_tv_trim(inside.substr(0, first_comma));
+        if (index_text.empty() || !std::all_of(index_text.begin(), index_text.end(),
+                                               [](char ch) { return ch >= '0' && ch <= '9'; })) {
+            result += format_string.substr(i, end - i + 1);
+            i = end + 1;
+            continue;
+        }
+        const size_t index = static_cast<size_t>(std::stoul(index_text));
+        if (index >= args.size()) {
+            result += format_string.substr(i, end - i + 1);
+            i = end + 1;
+            continue;
+        }
+        const auto& arg = args[index];
+        if (arg.kind == _PFTvFormatValue::Kind::Text) {
+            result += arg.text;
+        } else if (first_comma == std::string::npos) {
+            result += _pf_tv_number_style(arg.number, "");
+        } else {
+            const size_t second_comma = inside.find(',', first_comma + 1);
+            const std::string type = _pf_tv_trim(inside.substr(
+                first_comma + 1, second_comma - first_comma - 1));
+            if (type == "number") {
+                const std::string style = second_comma == std::string::npos
+                    ? "" : inside.substr(second_comma + 1);
+                result += _pf_tv_number_style(arg.number, style);
+            } else {
+                result += format_string.substr(i, end - i + 1);
+            }
+        }
+        i = end + 1;
+    }
+    return result;
+}
+
 
 // --- syminfo derivation helpers (PineForge G2) ---
 static inline std::string _pf_derive_prefix(const std::string& tickerid) {
@@ -113,10 +415,10 @@ public:
     double level = 0.0;
     bool eUp = false;
     bool eDn = false;
-    DrawingArena<LineRec> _pf_lines_{50};
-    DrawingArena<BoxRec> _pf_boxes_{50};
-    DrawingArena<LabelRec> _pf_labels_{50};
-    DrawingArena<LinefillRec> _pf_linefills_{50};
+    DrawingArena<LineRec> _pf_lines_{_PF_DRAWING_UNBOUNDED};
+    DrawingArena<BoxRec> _pf_boxes_{_PF_DRAWING_UNBOUNDED};
+    DrawingArena<LabelRec> _pf_labels_{_PF_DRAWING_UNBOUNDED};
+    DrawingArena<LinefillRec> _pf_linefills_{_PF_DRAWING_UNBOUNDED};
     bool _var_initialized = false;
     bool _ta_initialized_ = false;
     bool _inputs_initialized_ = false;
@@ -201,6 +503,7 @@ public:
         pineforge::source::PineStrategyHost::enable_pine_intraday_cap();
 #endif
         pineforge::source::PineStrategyConfig cfg{};
+        cfg.initial_capital = 100000.0;
         cfg.default_qty_type = static_cast<int>(QtyType::FIXED);
         cfg.default_qty_value = 1.0;
         cfg.pyramiding = 0;
@@ -259,14 +562,39 @@ public:
         this->level = 0.0;
         this->eUp = false;
         this->eDn = false;
-        this->_pf_lines_ = decltype(this->_pf_lines_){50};
-        this->_pf_boxes_ = decltype(this->_pf_boxes_){50};
-        this->_pf_labels_ = decltype(this->_pf_labels_){50};
-        this->_pf_linefills_ = decltype(this->_pf_linefills_){50};
+        this->_pf_lines_ = decltype(this->_pf_lines_){_PF_DRAWING_UNBOUNDED};
+        this->_pf_boxes_ = decltype(this->_pf_boxes_){_PF_DRAWING_UNBOUNDED};
+        this->_pf_labels_ = decltype(this->_pf_labels_){_PF_DRAWING_UNBOUNDED};
+        this->_pf_linefills_ = decltype(this->_pf_linefills_){_PF_DRAWING_UNBOUNDED};
         this->_var_initialized = false;
         this->_ta_initialized_ = false;
         this->_inputs_initialized_ = false;
         if (allow_precalculation) precalculate(bars, n);
+    }
+
+    Line _pf_collect_lines_(Line _pf_new) {
+        if ((int)this->_pf_lines_.order().size() >= 56) {
+            const int32_t _pf_held[] = {_pf_new.id, this->lv.id, this->lv2.id};
+            _pf_collect_drawings(this->_pf_lines_, 50, _pf_held,
+                                 sizeof(_pf_held) / sizeof(_pf_held[0]));
+        }
+        return _pf_new;
+    }
+    Box _pf_collect_boxes_(Box _pf_new) {
+        if ((int)this->_pf_boxes_.order().size() >= 56) {
+            const int32_t _pf_held[] = {_pf_new.id};
+            _pf_collect_drawings(this->_pf_boxes_, 50, _pf_held,
+                                 sizeof(_pf_held) / sizeof(_pf_held[0]));
+        }
+        return _pf_new;
+    }
+    Label _pf_collect_labels_(Label _pf_new) {
+        if ((int)this->_pf_labels_.order().size() >= 56) {
+            const int32_t _pf_held[] = {_pf_new.id};
+            _pf_collect_drawings(this->_pf_labels_, 50, _pf_held,
+                                 sizeof(_pf_held) / sizeof(_pf_held[0]));
+        }
+        return _pf_new;
     }
 
     void on_source_bar(const Bar& bar) override {
@@ -275,26 +603,26 @@ public:
         } else {
         }
         sma = (history_advances_new_bar() ? _ta_sma_1.compute(current_bar_.close) : _ta_sma_1.recompute(current_bar_.close));
-        if (is_na(lv)) {
-            lv = pf_line_new(_pf_lines_, (int64_t)(pine_bar_index()), (double)(sma), (int64_t)((pine_bar_index() + 1)), (double)(sma), XLoc::bar_index, true, true);
-            lv2 = pf_line_new(_pf_lines_, (int64_t)(pine_bar_index()), (double)(sma), (int64_t)((pine_bar_index() + 1)), (double)(sma), XLoc::bar_index, false, false);
+        if (_pf_drawing_na(_pf_lines_, lv)) {
+            lv = _pf_collect_lines_(pf_line_new(_pf_lines_, (int64_t)(pine_bar_index()), (double)(sma), (int64_t)((pine_bar_index() + 1)), (double)(sma), XLoc::bar_index, true, true));
+            lv2 = _pf_collect_lines_(pf_line_new(_pf_lines_, (int64_t)(pine_bar_index()), (double)(sma), (int64_t)((pine_bar_index() + 1)), (double)(sma), XLoc::bar_index, false, false));
             lf = pf_linefill_new(_pf_linefills_, lv, lv2);
         } else {
-            pf_line_set_y1(_pf_lines_, lv, (double)(sma));
-            pf_line_set_y2(_pf_lines_, lv, (double)(sma));
-            pf_noop(lv, pine_color::new_color(pine_color::blue, (int)(50)));
+            _pf_drawing_set(pf_line_set_y1, _pf_lines_, lv, (double)(sma));
+            _pf_drawing_set(pf_line_set_y2, _pf_lines_, lv, (double)(sma));
+            pf_noop(lv, pine_color::new_color(pine_color::blue, [&](){ auto _pf_color_v = (50); using _pf_color_t = std::decay_t<decltype(_pf_color_v)>; if constexpr (std::is_same_v<_pf_color_t, bool>) return _pf_color_v ? 1 : 0; else return is_na(_pf_color_v) ? 100 : (int)_pf_color_v; }()));
             pf_noop(lv, 2);
             pf_noop(lv, 0);
         }
-        lbl = pf_label_new(_pf_labels_, (int64_t)(pine_bar_index()), (double)(current_bar_.high), std::to_string(sma), XLoc::bar_index, YLoc::price);
-        pf_label_set_text(_pf_labels_, lbl, std::string("x"));
-        level = pf_line_get_y2(_pf_lines_, lv);
+        lbl = _pf_collect_labels_(pf_label_new(_pf_labels_, (int64_t)(pine_bar_index()), (double)(current_bar_.high), pine_str_tostring_tv(sma, std::string(), syminfo_mintick_), XLoc::bar_index, YLoc::price));
+        _pf_drawing_set(pf_label_set_text, _pf_labels_, lbl, std::string("x"));
+        level = _pf_drawing_get(pf_line_get_y2, _pf_lines_, lv);
         eUp = (history_advances_new_bar() ? _ta_crossover_2.compute(current_bar_.close, level) : _ta_crossover_2.recompute(current_bar_.close, level));
         eDn = (history_advances_new_bar() ? _ta_crossunder_3.compute(current_bar_.close, level) : _ta_crossunder_3.recompute(current_bar_.close, level));
-        if (eUp) {
+        if ([&](){ auto _pf_bool_v = (eUp); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }()) {
             strategy_entry(std::string("L"), true, na<double>(), na<double>(), na<double>(), "");
         }
-        if ((([&]{ auto _pna_l = (signed_position_size()); auto _pna_r = (0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }()) && eDn)) {
+        if ((([&]{ auto _pna_l = (signed_position_size()); auto _pna_r = (0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }()) && [&](){ auto _pf_bool_v = (eDn); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }())) {
             strategy_close(std::string("L"), "", na<double>(), na<double>(), false, 107374182419ULL);
         }
     }
