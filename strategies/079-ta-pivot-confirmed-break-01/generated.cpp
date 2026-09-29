@@ -250,14 +250,14 @@ public:
     }
 
     void on_source_bar(const Bar& bar) override {
-        if (!_var_initialized) {
-            _var_initialized = true;
-        } else {
-        }
         if (!_inputs_initialized_) {
             i_left = get_input_int("Pivot left bars", 4);
             i_right = get_input_int("Pivot right bars", 4);
             _inputs_initialized_ = true;
+        }
+        if (!_var_initialized) {
+            _var_initialized = true;
+        } else {
         }
         if (!_ta_initialized_) {
             _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot left bars", 4), get_input_int("Pivot right bars", 4));
@@ -295,8 +295,8 @@ public:
         _precalc__ta_pivothigh_1.resize(n);
         _precalc__ta_pivotlow_2.resize(n);
 
-        _ta_pivothigh_1 = ta::PivotHigh(4, 4);
-        _ta_pivotlow_2 = ta::PivotLow(4, 4);
+        _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot left bars", 4), get_input_int("Pivot right bars", 4));
+        _ta_pivotlow_2 = ta::PivotLow(get_input_int("Pivot left bars", 4), get_input_int("Pivot right bars", 4));
 
 
         for (int i = 0; i < n; ++i) {
@@ -317,8 +317,8 @@ public:
             _precalc__ta_pivotlow_2[i] = _ta_pivotlow_2.compute(bars[i].low);
         }
 
-        _ta_pivothigh_1 = ta::PivotHigh(4, 4);
-        _ta_pivotlow_2 = ta::PivotLow(4, 4);
+        _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot left bars", 4), get_input_int("Pivot right bars", 4));
+        _ta_pivotlow_2 = ta::PivotLow(get_input_int("Pivot left bars", 4), get_input_int("Pivot right bars", 4));
 
         _use_precalc = true;
     }

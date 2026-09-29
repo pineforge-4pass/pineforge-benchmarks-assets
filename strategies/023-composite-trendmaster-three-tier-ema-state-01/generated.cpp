@@ -277,15 +277,15 @@ public:
     }
 
     void on_source_bar(const Bar& bar) override {
-        if (!_var_initialized) {
-            _var_initialized = true;
-        } else {
-        }
         if (!_inputs_initialized_) {
             i_fast = get_input_int("EMA fast", 21);
             i_mid = get_input_int("EMA mid", 55);
             i_slow = get_input_int("EMA slow", 200);
             _inputs_initialized_ = true;
+        }
+        if (!_var_initialized) {
+            _var_initialized = true;
+        } else {
         }
         if (!_ta_initialized_) {
             _ta_ema_1 = ta::EMA(get_input_int("EMA fast", 21));
@@ -325,9 +325,9 @@ public:
         _precalc__ta_ema_2.resize(n);
         _precalc__ta_ema_3.resize(n);
 
-        _ta_ema_1 = ta::EMA(21);
-        _ta_ema_2 = ta::EMA(55);
-        _ta_ema_3 = ta::EMA(200);
+        _ta_ema_1 = ta::EMA(get_input_int("EMA fast", 21));
+        _ta_ema_2 = ta::EMA(get_input_int("EMA mid", 55));
+        _ta_ema_3 = ta::EMA(get_input_int("EMA slow", 200));
 
 
         for (int i = 0; i < n; ++i) {
@@ -349,9 +349,9 @@ public:
             _precalc__ta_ema_3[i] = _ta_ema_3.compute(bars[i].close);
         }
 
-        _ta_ema_1 = ta::EMA(21);
-        _ta_ema_2 = ta::EMA(55);
-        _ta_ema_3 = ta::EMA(200);
+        _ta_ema_1 = ta::EMA(get_input_int("EMA fast", 21));
+        _ta_ema_2 = ta::EMA(get_input_int("EMA mid", 55));
+        _ta_ema_3 = ta::EMA(get_input_int("EMA slow", 200));
 
         _use_precalc = true;
     }

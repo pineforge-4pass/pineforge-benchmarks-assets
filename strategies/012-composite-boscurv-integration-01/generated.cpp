@@ -368,6 +368,15 @@ public:
     void on_source_bar(const Bar& bar) override {
         if (history_advances_new_bar()) _s_close.push(current_bar_.close);
         else _s_close.update(current_bar_.close);
+        if (!_inputs_initialized_) {
+            i_left = get_input_int("Pivot left bars", 5);
+            i_right = get_input_int("Pivot right bars", 5);
+            i_lr_len = get_input_int("Linreg length", 50);
+            i_atr_len = get_input_int("ATR length", 14);
+            i_atr_mult = get_input_double("ATR multiplier", 2.0);
+            i_curve_offset = get_input_double("Slope curve offset", 5.0);
+            _inputs_initialized_ = true;
+        }
         if (!_var_initialized) {
             last_ph.push(na<double>());
             last_pl.push(na<double>());
@@ -377,15 +386,6 @@ public:
             else last_ph.update(last_ph[0]);
             if (history_advances_new_bar()) last_pl.push(last_pl[0]);
             else last_pl.update(last_pl[0]);
-        }
-        if (!_inputs_initialized_) {
-            i_left = get_input_int("Pivot left bars", 5);
-            i_right = get_input_int("Pivot right bars", 5);
-            i_lr_len = get_input_int("Linreg length", 50);
-            i_atr_len = get_input_int("ATR length", 14);
-            i_atr_mult = get_input_double("ATR multiplier", 2.0);
-            i_curve_offset = get_input_double("Slope curve offset", 5.0);
-            _inputs_initialized_ = true;
         }
         if (!_ta_initialized_) {
             _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot left bars", 5), get_input_int("Pivot right bars", 5));
@@ -441,11 +441,11 @@ public:
         _precalc__ta_linreg_4.resize(n);
         _precalc__ta_atr_5.resize(n);
 
-        _ta_pivothigh_1 = ta::PivotHigh(5, 5);
-        _ta_pivotlow_2 = ta::PivotLow(5, 5);
-        _ta_linreg_3 = ta::Linreg(50);
-        _ta_linreg_4 = ta::Linreg(50);
-        _ta_atr_5 = ta::ATR(14);
+        _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot left bars", 5), get_input_int("Pivot right bars", 5));
+        _ta_pivotlow_2 = ta::PivotLow(get_input_int("Pivot left bars", 5), get_input_int("Pivot right bars", 5));
+        _ta_linreg_3 = ta::Linreg(get_input_int("Linreg length", 50));
+        _ta_linreg_4 = ta::Linreg(get_input_int("Linreg length", 50));
+        _ta_atr_5 = ta::ATR(get_input_int("ATR length", 14));
 
         _s_close.clear();
 
@@ -471,11 +471,11 @@ public:
             _precalc__ta_atr_5[i] = _ta_atr_5.compute(bars[i].high, bars[i].low, bars[i].close, (i > 0 ? bars[i - 1].close : na<double>()));
         }
 
-        _ta_pivothigh_1 = ta::PivotHigh(5, 5);
-        _ta_pivotlow_2 = ta::PivotLow(5, 5);
-        _ta_linreg_3 = ta::Linreg(50);
-        _ta_linreg_4 = ta::Linreg(50);
-        _ta_atr_5 = ta::ATR(14);
+        _ta_pivothigh_1 = ta::PivotHigh(get_input_int("Pivot left bars", 5), get_input_int("Pivot right bars", 5));
+        _ta_pivotlow_2 = ta::PivotLow(get_input_int("Pivot left bars", 5), get_input_int("Pivot right bars", 5));
+        _ta_linreg_3 = ta::Linreg(get_input_int("Linreg length", 50));
+        _ta_linreg_4 = ta::Linreg(get_input_int("Linreg length", 50));
+        _ta_atr_5 = ta::ATR(get_input_int("ATR length", 14));
         _s_close.clear();
 
         _use_precalc = true;
