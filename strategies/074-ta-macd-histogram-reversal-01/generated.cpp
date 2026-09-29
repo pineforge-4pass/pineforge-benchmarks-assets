@@ -271,10 +271,10 @@ public:
         double histLine = _result__ta_macd_1.histogram;
         longCond = (history_advances_new_bar() ? _ta_crossover_2.compute(macdLine, signalLine) : _ta_crossover_2.recompute(macdLine, signalLine));
         shortCond = (history_advances_new_bar() ? _ta_crossunder_3.compute(macdLine, signalLine) : _ta_crossunder_3.recompute(macdLine, signalLine));
-        if (longCond) {
+        if ([&](){ auto _pf_bool_v = (longCond); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }()) {
             strategy_entry(std::string("Long"), true, na<double>(), na<double>(), na<double>(), "");
         }
-        if (shortCond) {
+        if ([&](){ auto _pf_bool_v = (shortCond); using _pf_bool_t = std::decay_t<decltype(_pf_bool_v)>; if constexpr (std::is_same_v<_pf_bool_t, bool>) { return _pf_bool_v; } else if constexpr (std::is_floating_point_v<_pf_bool_t> || std::is_integral_v<_pf_bool_t>) { return is_na(_pf_bool_v) ? false : (_pf_bool_v != 0); } else { return static_cast<bool>(_pf_bool_v); } }()) {
             strategy_entry(std::string("Short"), false, na<double>(), na<double>(), na<double>(), "");
         }
     }
@@ -285,7 +285,7 @@ public:
 
         _precalc__ta_macd_1.resize(n);
 
-        _ta_macd_1 = ta::MACD(12, 26, 9);
+        _ta_macd_1 = ta::MACD(get_input_int("Fast Length", 12), get_input_int("Slow Length", 26), get_input_int("Signal Length", 9));
 
         _src_open_.clear(); _src_high_.clear(); _src_low_.clear();
         _src_close_.clear(); _src_volume_.clear();
@@ -310,7 +310,7 @@ public:
             _precalc__ta_macd_1[i] = _ta_macd_1.compute(src);
         }
 
-        _ta_macd_1 = ta::MACD(12, 26, 9);
+        _ta_macd_1 = ta::MACD(get_input_int("Fast Length", 12), get_input_int("Slow Length", 26), get_input_int("Signal Length", 9));
         _src_open_.clear(); _src_high_.clear(); _src_low_.clear();
         _src_close_.clear(); _src_volume_.clear();
         _src_hl2_.clear(); _src_hlc3_.clear();

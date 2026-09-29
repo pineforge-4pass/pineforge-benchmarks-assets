@@ -405,11 +405,6 @@ public:
     void on_source_bar(const Bar& bar) override {
         if (history_advances_new_bar()) _s_close.push(current_bar_.close);
         else _s_close.update(current_bar_.close);
-        if (!_var_initialized) {
-            factorRows = PineMatrix::new_(2, 3, 0.0);
-            _var_initialized = true;
-        } else {
-        }
         if (!_inputs_initialized_) {
             shortHorizon = get_input_int("Short Horizon", 6);
             mediumHorizon = get_input_int("Medium Horizon", 18);
@@ -420,6 +415,11 @@ public:
             maximumAtrLoss = get_input_double("Maximum ATR Loss", 2.4);
             _inputs_initialized_ = true;
         }
+        if (!_var_initialized) {
+            factorRows = PineMatrix::new_(2, 3, 0.0);
+            _var_initialized = true;
+        } else {
+        }
         if (!_ta_initialized_) {
             _ta_sma_1 = ta::SMA(get_input_int("Short Horizon", 6));
             _ta_sma_2 = ta::SMA(get_input_int("Medium Horizon", 18));
@@ -428,9 +428,9 @@ public:
             _ta_atr_5 = ta::ATR(get_input_int("ATR Length", 16));
             _ta_initialized_ = true;
         }
-        shortPriceUp = ((([&]{ auto _pna_l = (current_bar_.close); auto _pna_r = (_s_close[shortHorizon]); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
-        mediumPriceUp = ((([&]{ auto _pna_l = (current_bar_.close); auto _pna_r = (_s_close[mediumHorizon]); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
-        longPriceUp = ((([&]{ auto _pna_l = (current_bar_.close); auto _pna_r = (_s_close[longHorizon]); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
+        shortPriceUp = ((([&]{ auto _pna_l = (current_bar_.close); auto _pna_r = (_s_close[([&](){ auto _pf_idx_v = (shortHorizon); using _pf_idx_t = std::decay_t<decltype(_pf_idx_v)>; if constexpr (std::is_same_v<_pf_idx_t, bool>) return (int)_pf_idx_v; else return is_na(_pf_idx_v) ? na<int>() : (int)_pf_idx_v; }())]); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
+        mediumPriceUp = ((([&]{ auto _pna_l = (current_bar_.close); auto _pna_r = (_s_close[([&](){ auto _pf_idx_v = (mediumHorizon); using _pf_idx_t = std::decay_t<decltype(_pf_idx_v)>; if constexpr (std::is_same_v<_pf_idx_t, bool>) return (int)_pf_idx_v; else return is_na(_pf_idx_v) ? na<int>() : (int)_pf_idx_v; }())]); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
+        longPriceUp = ((([&]{ auto _pna_l = (current_bar_.close); auto _pna_r = (_s_close[([&](){ auto _pf_idx_v = (longHorizon); using _pf_idx_t = std::decay_t<decltype(_pf_idx_v)>; if constexpr (std::is_same_v<_pf_idx_t, bool>) return (int)_pf_idx_v; else return is_na(_pf_idx_v) ? na<int>() : (int)_pf_idx_v; }())]); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
         shortVolumeFirm = ((([&]{ auto _pna_l = (current_bar_.volume); auto _pna_r = ((_use_precalc ? _precalc__ta_sma_1[bar_index_] : (history_advances_new_bar() ? _ta_sma_1.compute(current_bar_.volume) : _ta_sma_1.recompute(current_bar_.volume)))); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
         mediumVolumeFirm = ((([&]{ auto _pna_l = (current_bar_.volume); auto _pna_r = ((_use_precalc ? _precalc__ta_sma_2[bar_index_] : (history_advances_new_bar() ? _ta_sma_2.compute(current_bar_.volume) : _ta_sma_2.recompute(current_bar_.volume)))); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
         longVolumeFirm = ((([&]{ auto _pna_l = (current_bar_.volume); auto _pna_r = ((_use_precalc ? _precalc__ta_sma_3[bar_index_] : (history_advances_new_bar() ? _ta_sma_3.compute(current_bar_.volume) : _ta_sma_3.recompute(current_bar_.volume)))); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && ((_pfc_l > _pfc_r) && !_pfc_eq); }())) ? (1.0) : (0.0));
@@ -449,8 +449,8 @@ public:
         if (_for_step_0 == 0) _for_step_0 = 1;
         const bool _for_down_0 = (_for_start_0 > _for_end_0);
         for (int horizonIndex = _for_start_0; (_for_down_0 ? (horizonIndex >= _for_end_0) : (horizonIndex <= _for_end_0)); horizonIndex += (_for_down_0 ? -_for_step_0 : _for_step_0), _for_end_0 = (2)) {
-            double priceVote = horizonPairs.get((int)(horizonIndex), (int)(0));
-            double volumeVote = horizonPairs.get((int)(horizonIndex), (int)(1));
+            double priceVote = horizonPairs.get(([&](){ auto _pf_idx_v = (horizonIndex); using _pf_idx_t = std::decay_t<decltype(_pf_idx_v)>; if constexpr (std::is_same_v<_pf_idx_t, bool>) return (int)_pf_idx_v; else return is_na(_pf_idx_v) ? na<int>() : (int)_pf_idx_v; }()), (int)(0));
+            double volumeVote = horizonPairs.get(([&](){ auto _pf_idx_v = (horizonIndex); using _pf_idx_t = std::decay_t<decltype(_pf_idx_v)>; if constexpr (std::is_same_v<_pf_idx_t, bool>) return (int)_pf_idx_v; else return is_na(_pf_idx_v) ? na<int>() : (int)_pf_idx_v; }()), (int)(1));
             if ((([&]{ auto _pna_l = (priceVote); auto _pna_r = (1.0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && (_pfc_eq); }()) && ([&]{ auto _pna_l = (volumeVote); auto _pna_r = (1.0); double _pfc_l = static_cast<double>(_pna_l); double _pfc_r = static_cast<double>(_pna_r); bool _pfc_eq = (_pfc_l == _pfc_r) || (std::isfinite(_pfc_l) && std::isfinite(_pfc_r) && std::fabs(_pfc_l - _pfc_r) <= 1e-10); return !is_na(_pna_l) && !is_na(_pna_r) && (_pfc_eq); }()))) {
                 confirmedPairs += 1;
             }
@@ -480,11 +480,11 @@ public:
         _precalc__ta_ema_4.resize(n);
         _precalc__ta_atr_5.resize(n);
 
-        _ta_sma_1 = ta::SMA(6);
-        _ta_sma_2 = ta::SMA(18);
-        _ta_sma_3 = ta::SMA(54);
-        _ta_ema_4 = ta::EMA(43);
-        _ta_atr_5 = ta::ATR(16);
+        _ta_sma_1 = ta::SMA(get_input_int("Short Horizon", 6));
+        _ta_sma_2 = ta::SMA(get_input_int("Medium Horizon", 18));
+        _ta_sma_3 = ta::SMA(get_input_int("Long Horizon", 54));
+        _ta_ema_4 = ta::EMA(get_input_int("Trend EMA Length", 43));
+        _ta_atr_5 = ta::ATR(get_input_int("ATR Length", 16));
 
         _s_close.clear();
 
@@ -510,11 +510,11 @@ public:
             _precalc__ta_atr_5[i] = _ta_atr_5.compute(bars[i].high, bars[i].low, bars[i].close, (i > 0 ? bars[i - 1].close : na<double>()));
         }
 
-        _ta_sma_1 = ta::SMA(6);
-        _ta_sma_2 = ta::SMA(18);
-        _ta_sma_3 = ta::SMA(54);
-        _ta_ema_4 = ta::EMA(43);
-        _ta_atr_5 = ta::ATR(16);
+        _ta_sma_1 = ta::SMA(get_input_int("Short Horizon", 6));
+        _ta_sma_2 = ta::SMA(get_input_int("Medium Horizon", 18));
+        _ta_sma_3 = ta::SMA(get_input_int("Long Horizon", 54));
+        _ta_ema_4 = ta::EMA(get_input_int("Trend EMA Length", 43));
+        _ta_atr_5 = ta::ATR(get_input_int("ATR Length", 16));
         _s_close.clear();
 
         _use_precalc = true;
