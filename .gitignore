@@ -11,3 +11,5 @@ _indicators/__pycache__/
 # Per-slot runner failure logs (run_all.sh), regenerated each run
 strategies/**/_pynecore_error.log
 strategies/**/_pineforge_error.log
+# macOS Finder metadata
+.DS_Store
